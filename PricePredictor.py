@@ -1,10 +1,14 @@
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from pandas.plotting import register_matplotlib_converters
 import pandas as pd
 from PlotSettings import *
 import tkinter as tk
 from tkinter import ttk
 from threading import Thread
 
+register_matplotlib_converters()
 
 class Calculator:
 	def __init__(self, df):
@@ -31,47 +35,88 @@ class Calculator:
 		plt.legend()
 		plt.show()
 
-	def plot_two_metrics(self, index1, index2):  # Index should be multivariate like ["Home", "Price"]
-		fig, ax = get_plot()
+	def get_x_y_by_phase(self, x_index, y_index):  # Index should be multivariate like ["Home", "Price"]
+		result_x = []
+		result_y = []
 		for phase in self.sheets:  # Iterate over sheets in Excel
-			x_data = self.get_index(index1, df_key=phase)
-			y_data = self.get_index(index2, df_key=phase)
-			ax.scatter(x_data, y_data, label=phase)
-		plt.xlabel(" ".join(index1))
-		plt.ylabel(" ".join(index2))
-		plt.legend()
+			x_data = self.get_index(x_index, df_key=phase)
+			y_data = self.get_index(y_index, df_key=phase)
+			result_x.append(x_data)
+			result_y.append(y_data)
+		return result_x, result_y
 
 class InputFrame(tk.Frame):
-	def __init__(self, parent, fields, *args, **kwargs):
+	def __init__(self, parent, calc_obj, graph_frame, *args, **kwargs):
 		tk.Frame.__init__(self, parent, *args, **kwargs)
 		self.parent = parent
-		self.fields = fields
+		self.calculator = calc_obj
+		self.fields = calc_obj.df["1"].columns
+		self.graph = graph_frame
 		self.x_vars = {}
 		self.y_vars = {}
 		for field in self.fields:
-			tk.Label(self, text=" ".join(field)).pack(side="left", fill="both", expand=True)
-			check_frame = tk.Frame(self).pack(side="right")
+			row_frame = tk.Frame(self)
+			tk.Label(row_frame, text=" ".join(field)).pack(side="left", fill="both", expand=True)
+			checkbutton_frame = tk.Frame(row_frame)
 			x_var = tk.BooleanVar()
 			self.x_vars[field] = x_var
-			tk.Checkbutton(check_frame, variable=x_var).pack(side="left", fill="x")
+			tk.Checkbutton(checkbutton_frame, variable=x_var, command=self.run_calculation).pack(side="left", fill="both")
 			y_var = tk.BooleanVar()
 			self.y_vars[field] = y_var
-			tk.Checkbutton(check_frame, variable=y_var).pack(side="right", fill="x")
-			self.pack(fill="both")
+			tk.Checkbutton(checkbutton_frame, variable=y_var, command=self.run_calculation).pack(side="right", fill="both")
+			checkbutton_frame.pack(side="right", fill="x")
+			row_frame.pack(fill="both")
+
+	def run_calculation(self):
+		print("Computing changes")
+		used_x_vars = dict(filter(lambda elem: elem[1].get() is True, self.x_vars.items()))  # Filter variables to only have user selections into a new dictionary
+		used_y_vars = dict(filter(lambda elem: elem[1].get() is True, self.y_vars.items()))
+		if len(used_x_vars) == 1 and len(used_y_vars) == 1:
+			self.graph.clear_graph()
+			x_var = list(used_x_vars.keys())[0]
+			y_var = list(used_y_vars.keys())[0]
+			print("graphing {} vs {}".format(x_var, y_var))
+			x_dfs, y_dfs = self.calculator.get_x_y_by_phase(x_var, y_var)
+			for x, y in zip(x_dfs, y_dfs):
+				self.graph.axis.scatter(x, y)
+			self.graph.axis.set_xlabel(" ".join(x_var))
+			self.graph.axis.set_ylabel(" ".join(y_var))
 
 
 class GraphFrame(tk.Frame):
 	def __init__(self, parent, *args, **kwargs):
 		tk.Frame.__init__(self, parent, *args, **kwargs)
 		self.parent = parent
-		tk.Label(self, text="GRAPH AREA").pack(expand=True, fill="both")
+		self.fig = Figure(facecolor="white", dpi=100, figsize=(8, 8))
+		self.axis = self.fig.add_subplot(111)
+		self.fig.set_tight_layout(True)
+		self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+		self.canvas.get_tk_widget().grid(row=0, column=0, sticky='nsew')
+		self.canvas.get_tk_widget().rowconfigure(0, weight=1)
+		self.canvas.get_tk_widget().columnconfigure(0, weight=1)
+
+	def clear_graph(self):
+		self.axis.clear()
+		self.canvas.draw_idle()
+
+	def scatter_data(self, x_data, y_data, x_label=None, y_label=None):
+		if x_label:
+			self.axis.set_xlabel(x_label)
+		if y_label:
+			self.axis.set_ylabel(y_label)
+		self.axis.scatter(x_data, y_data)
+
 
 
 if __name__ == "__main__":
 	calculator = Calculator(pd.read_excel("/Users/reed/PycharmProjects/760_Marketing/New Shoes.xlsx", sheet_name=None, index_col=0, header=[0, 1]))
 	root = tk.Tk()
-	InputFrame(root, calculator.df["1"].columns).grid(row=0, column=0)
-	GraphFrame(root).grid(row=0, column=1)
+	graph = GraphFrame(root)
+	graph.grid(row=0, column=1)
+	InputFrame(root, calculator, graph).grid(row=0, column=0)
+	root.columnconfigure(1, weight=1)
+	root.rowconfigure(0, weight=1)
+
 	root.wm_title("New Shoes Calculator")
 	root.mainloop()
 
