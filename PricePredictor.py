@@ -3,6 +3,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from pandas.plotting import register_matplotlib_converters
 import pandas as pd
+import numpy as np
 from PlotSettings import *
 import tkinter as tk
 from tkinter import ttk
@@ -77,17 +78,27 @@ class InputFrame(tk.Frame):
 			y_var = list(used_y_vars.keys())[0]
 			print("graphing {} vs {}".format(x_var, y_var))
 			x_dfs, y_dfs = self.calculator.get_x_y_by_phase(x_var, y_var)
+			max_x, min_x, max_y, min_y = -1 * np.inf, np.inf, -1 * np.inf, np.inf
 			for x, y in zip(x_dfs, y_dfs):
 				self.graph.axis.scatter(x, y)
+				max_x = max(max(x), max_x)
+				min_x = min(min(x), min_x)
+				max_y = max(max(y), max_y)
+				min_y = min(min(y), min_y)
 			self.graph.axis.set_xlabel(" ".join(x_var))
 			self.graph.axis.set_ylabel(" ".join(y_var))
+			self.graph.axis.grid(which='major', alpha=0.85)
+			self.graph.axis.grid(which="minor", alpha=0.3)
+
+			# self.graph.axis.set_xticks(np.linspace(min_x, max_x, 20))
+			# self.graph.axis.set_yticks(np.linspace(min_y, max_y, 20))
 
 
 class GraphFrame(tk.Frame):
 	def __init__(self, parent, *args, **kwargs):
 		tk.Frame.__init__(self, parent, *args, **kwargs)
 		self.parent = parent
-		self.fig = Figure(facecolor="white", dpi=100, figsize=(8, 8))
+		self.fig = Figure(facecolor="white", dpi=100, figsize=(10, 10))
 		self.axis = self.fig.add_subplot(111)
 		self.fig.set_tight_layout(True)
 		self.canvas = FigureCanvasTkAgg(self.fig, master=self)
@@ -105,6 +116,7 @@ class GraphFrame(tk.Frame):
 		if y_label:
 			self.axis.set_ylabel(y_label)
 		self.axis.scatter(x_data, y_data)
+		self.canvas.draw_idle()
 
 
 
