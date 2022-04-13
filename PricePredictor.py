@@ -39,12 +39,14 @@ class Calculator:
 	def get_x_y_by_phase(self, x_index, y_index):  # Index should be multivariate like ["Home", "Price"]
 		result_x = []
 		result_y = []
+		labels = []
 		for phase in self.sheets:  # Iterate over sheets in Excel
 			x_data = self.get_index(x_index, df_key=phase)
 			y_data = self.get_index(y_index, df_key=phase)
+			labels.append(phase)
 			result_x.append(x_data)
 			result_y.append(y_data)
-		return result_x, result_y
+		return result_x, result_y, labels
 
 class InputFrame(tk.Frame):
 	def __init__(self, parent, calc_obj, graph_frame, *args, **kwargs):
@@ -77,14 +79,10 @@ class InputFrame(tk.Frame):
 			x_var = list(used_x_vars.keys())[0]
 			y_var = list(used_y_vars.keys())[0]
 			print("graphing {} vs {}".format(x_var, y_var))
-			x_dfs, y_dfs = self.calculator.get_x_y_by_phase(x_var, y_var)
-			max_x, min_x, max_y, min_y = -1 * np.inf, np.inf, -1 * np.inf, np.inf
-			for x, y in zip(x_dfs, y_dfs):
-				self.graph.axis.scatter(x, y)
-				max_x = max(max(x), max_x)
-				min_x = min(min(x), min_x)
-				max_y = max(max(y), max_y)
-				min_y = min(min(y), min_y)
+			x_dfs, y_dfs, labels = self.calculator.get_x_y_by_phase(x_var, y_var)
+			for x, y, this_label in zip(x_dfs, y_dfs, labels):
+				self.graph.axis.scatter(x, y, label="{}".format(this_label))
+			self.graph.axis.legend()
 			self.graph.axis.set_xlabel(" ".join(x_var))
 			self.graph.axis.set_ylabel(" ".join(y_var))
 			self.graph.axis.grid(which='major', alpha=0.85)
